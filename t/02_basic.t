@@ -23,8 +23,6 @@ subtest "basic test" => sub {
 
     ok !$factory->silence, 'silence is false by default';
     ok $factory->autoderef, 'autoderef should be true';
-    ok !defined( $factory->default ),
-      'default value should be undef ( but useless on autodie mode )';
 
     is $factory->resolve('one')->epoch, 1, 'should be one';
     is $factory->resolve('two')->epoch, 2, 'should be two ( from ref ref )';

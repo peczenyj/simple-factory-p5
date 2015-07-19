@@ -1,8 +1,9 @@
 use strict;
 use warnings;
+
 package Simple::Factory;
 
-#ABSTRACT: simple factory 
+#ABSTRACT: simple factory
 
 use feature 'switch';
 use Carp qw(carp croak confess);
@@ -16,9 +17,9 @@ use namespace::autoclean;
 has build_class => (
     is       => 'ro',
     required => 1,
-    coerce   => sub { 
-        my ($class) = @_; 
-        use_module($class); 
+    coerce   => sub {
+        my ($class) = @_;
+        use_module($class);
     }
 );
 
@@ -27,8 +28,8 @@ has build_conf => (
     isa         => HashRef [Any],
     required    => 1,
     handles_via => 'Hash',
-    handles => { 
-        has_build_conf_for  => 'exists', 
+    handles     => {
+        has_build_conf_for  => 'exists',
         get_build_conf_for  => 'get',
         _add_build_conf_for => 'set',
     }
@@ -38,13 +39,15 @@ has fallback     => ( is => 'ro', predicate => 1 );
 has build_method => ( is => 'ro', default   => sub { "new" } );
 has autoderef    => ( is => 'ro', isa       => Bool, default => sub { 1 } );
 has silence      => ( is => 'ro', isa       => Bool, default => sub { 0 } );
-has default      => ( is => 'ro', default   => sub { undef } );
-has cache        => ( is => 'ro', isa       => HasMethods [qw(get set remove)], predicate => 1 );
+has cache =>
+  ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
+
+has inline => ( is => 'ro', isa => Bool, default => sub { 0 } );
 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
 
-    if ( scalar( @args ) == 1 ){ 
+    if ( scalar(@args) == 1 ) {
         unshift @args, "build_class";
     }
     my (%hash_args) = @args;
@@ -58,6 +61,12 @@ sub BUILDARGS {
 
         $hash_args{build_class} = $build_class;
         $hash_args{build_conf}  = $build_conf;
+
+        if ( $hash_args{inline} ) {
+            $hash_args{build_conf} = {   
+                map { $_ => { $_ => $build_conf->{ $_ } } } keys %$build_conf,
+            }
+        }
     }
 
     \%hash_args;
@@ -82,7 +91,8 @@ sub _build_object_from_args {
             default {
                 carp(   "cant autoderef argument ref('"
                       . ref($args)
-                      . "') for class '$class'" ) if ! $self->silence;
+                      . "') for class '$class'" )
+                  if !$self->silence;
             }
         }
     }
@@ -95,26 +105,28 @@ sub _resolve_object {
 
     my $class = $self->build_class;
     if ( $self->has_build_conf_for($key) ) {
-        return $self->_build_object_from_args(
-            $self->get_build_conf_for($key), $key );
+        return $self->_build_object_from_args( $self->get_build_conf_for($key),
+            $key );
     }
     elsif ( $self->has_fallback ) {
         return $self->_build_object_from_args( $self->fallback, $key );
     }
-   
+
     confess("instance of '$class' named '$key' not found");
 }
 
 sub add_build_conf_for {
-    my ($self, $key, $conf, %conf ) = @_;
+    my ( $self, $key, $conf, %conf ) = @_;
 
-    if ( $self->has_build_conf_for( $key ) && $conf{not_override}){
+    if ( $self->has_build_conf_for($key) && $conf{not_override} ) {
         croak("cannot override exiting configuration for key '$key'");
-    } elsif ( $self->has_build_conf_for( $key ) && $self->has_cache ){
+    }
+    elsif ( $self->has_build_conf_for($key) && $self->has_cache ) {
+
         # if we are using cache
         # and we substitute the configuration for some reason
         # we should first remove the cache for this particular key
-        $self->cache->remove( $key );
+        $self->cache->remove($key);
     }
 
     $self->_add_build_conf_for( $key => $conf );
@@ -131,15 +143,15 @@ sub resolve {
     my $instance = $self->_resolve_object($key);
 
     if ( $self->has_cache ) {
-        $instance = $self->cache->set( $key => [ $instance ])->[0];
+        $instance = $self->cache->set( $key => [$instance] )->[0];
     }
 
-    if ( scalar(@keys) && $instance->can('resolve')){
+    if ( scalar(@keys) && $instance->can('resolve') ) {
         return $instance->resolve(@keys);
     }
 
     return $instance;
-};
+}
 
 1;
 
@@ -226,19 +238,33 @@ If true ( default ), we will try to deref the argument present in the C<build_co
 
 =over 4
 
-=item 1. will deref only references
+=item * 
 
-=item 2. if the reference is an array, we will call the C<build_method> with C<@$array>.  
+will deref only references
 
-=item 3. if the reference is a hash, we will call the C<build_method> with C<%$hash>.
+=item * 
 
-=item 4. if the reference is a scalar or other ref, we will call the C<build_method> with C<$$ref>.
+if the reference is an array, we will call the C<build_method> with C<@$array>.  
 
-=item 5. if the reference is a glob, we will call the C<build_method> with C<*$glob>.
+=item * 
 
-=item 6. if the reference is a code, we will call the C<build_method> with $code->( $key ) ( same thinf for the fallback )
+if the reference is a hash, we will call the C<build_method> with C<%$hash>.
 
-=item 7. other cases (like Regexes) we will carp if it is not in C<silence> mode. 
+=item * 
+
+if the reference is a scalar or other ref, we will call the C<build_method> with C<$$ref>.
+
+=item * 
+
+if the reference is a glob, we will call the C<build_method> with C<*$glob>.
+
+=item * 
+
+if the reference is a code, we will call the C<build_method> with $code->( $key ) ( same thinf for the fallback )
+
+=item * 
+
+other cases (like Regexes) we will carp if it is not in C<silence> mode. 
 
 =back
 
@@ -248,7 +274,7 @@ If true ( default is false ), we will omit the carp message if we can't C<autode
 
 =head2 cache
 
-If present, we will cache the result of the method C<resolve>. The cache should responds to C<get>, C<set> and C<remove> like L<CHI>.
+If present, we will cache the result of the method C<resolve>. The cache should responds to C<get>, C<set> and C<remove> like L<CHI|CHI>.
 
 We will also cache fallback cases.
 
@@ -271,6 +297,7 @@ Options: you can avoid override one existing configuration with C<not_override> 
 Will remove C<cache> if possible.
 
 Example:
+
     $factory->add_build_conf_for( last => { foo => 1, bar => 2 }); # can override
     $factory->add_build_conf_for( last => { ... }, not_override => 1); # will croak instead override
 
@@ -289,6 +316,7 @@ You can pass multiple keys. If the instance responds to C<resolve> method, we wi
 for inline many factories.
 
 Example:
+
     my $factory = Simple::Factory->new(
         'Simple::Factory' => {
             Foo => {
@@ -316,11 +344,11 @@ We use C<fallback> when we can't find the C<build_conf> based on the key.
 
 =over 4
 
-=item L<Bread-Board>
+=item L<Bread::Board>
 
 A solderless way to wire up your application components.
 
-=item L<IOC>
+=item L<IOC|IOC>
 
 A lightweight IOC (Inversion of Control) framework
 
