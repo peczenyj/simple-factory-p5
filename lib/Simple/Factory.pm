@@ -37,12 +37,15 @@ has build_conf => (
 has fallback     => ( is => 'ro', predicate => 1 );
 has build_method => ( is => 'ro', default   => sub { "new" } );
 has autoderef    => ( is => 'ro', isa       => Bool, default => sub { 1 } );
+has silence      => ( is => 'ro', isa       => Bool, default => sub { 0 } );
 has default      => ( is => 'ro', default   => sub { undef } );
-has cache        => ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
+has cache        => ( is => 'ro', isa       => HasMethods [qw(get set remove)], predicate => 1 );
 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
 
+    unshift @args, "build_class" if scalar(@args) == 1;
+    
     my (%hash_args) = @args;
 
     if (   scalar(@args) >= 2
@@ -78,7 +81,7 @@ sub _build_object_from_args {
             default {
                 carp(   "cant autoderef argument ref('"
                       . ref($args)
-                      . "') for class '$class'" )
+                      . "') for class '$class'" ) if ! $self->silence;
             }
         }
     }

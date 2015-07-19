@@ -24,13 +24,15 @@ subtest "should add new conf" => sub {
 
 subtest "should substitute conf and clear cache" => sub {
     my $hash = {};
-    my $factory = Simple::Factory->new( Foo => { a => 1 }, autoderef => 0, cache => CHI->new( driver => 'RawMemory', datastore => $hash ));
+    my $factory = Simple::Factory->new( Foo => { a => 1, b=> 2 }, autoderef => 0, cache => CHI->new( driver => 'RawMemory', datastore => $hash ));
 
     my $a = $factory->resolve('a');
 
     isa_ok $a, 'Foo', 'a';
     is $a->value, 1, 'value should be 1';
-    my $old_addr = refaddr( $a );
+    
+    my $old_refaddr_for_a = refaddr( $a );
+    my $old_refaddr_for_b = refaddr( $factory->resolve('b') );
 
     $factory->add_build_conf_for( a => 1000 );
 
@@ -39,7 +41,8 @@ subtest "should substitute conf and clear cache" => sub {
     isa_ok $a, 'Foo', 'new a';
     is $a->value, 1000, 'value now is 1000';
 
-    ok refaddr( $a ) ne $old_addr, 'should purge the cache';
+    ok refaddr( $a ) ne $old_refaddr_for_a, 'should purge the cache';
+    ok refaddr( $factory->resolve('b') ) eq $old_refaddr_for_b, 'should not touch in the entire cache, only for a';
 };
 
 done_testing;
