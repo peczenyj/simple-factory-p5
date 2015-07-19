@@ -372,6 +372,14 @@ C<fallback> will resolve the fallback ( but in case of exception will die - to a
 
 =back
 
+Example:
+
+    my $factory = Simple::Factory->new(
+        Foo => { ... },
+        fallback => -1,
+        on_error => "fallback" # in case of some exception, call the fallback
+    );
+
 If one coderef was used, it will be called with one hashref as argument with three fields:
 
 =over 4
