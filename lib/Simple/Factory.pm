@@ -44,12 +44,6 @@ has cache        => ( is => 'ro', isa       => HasMethods [qw(get set remove)], 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
 
-    #use Data::Dumper;
-    #warn Dumper({ new => \@args });
-
-    #if( scalar( @args ) == 1 && ref( $args[0] ) && ref( $args[0] ) eq 'HASH') {
-    #    ( @args ) = %{ $args[0] };
-    #} els
     if ( scalar( @args ) == 1 ){ 
         unshift @args, "build_class";
     }
@@ -66,7 +60,6 @@ sub BUILDARGS {
         $hash_args{build_conf}  = $build_conf;
     }
 
-    #warn Dumper({ nnew => \%hash_args });
     \%hash_args;
 }
 
@@ -78,7 +71,7 @@ sub _build_object_from_args {
       or confess "class '$class' does not support build method: "
       . $self->build_method;
 
-    if ( $self->autoderef && defined ref($args) ) {
+    if ( $self->autoderef && ref($args) ) {
         given ( ref($args) ) {
             when ('ARRAY')  { return $class->$method( @{$args} ); }
             when ('HASH')   { return $class->$method( %{$args} ); }
