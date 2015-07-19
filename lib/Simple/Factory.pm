@@ -35,16 +35,16 @@ has build_conf => (
 );
 
 sub add_build_conf_for {
-    my ($self, $identifier, $conf ) = @_;
+    my ($self, $key, $conf ) = @_;
 
-    if ( $self->has_cache && $self->has_build_conf_for( $identifier ) ){
+    if ( $self->has_cache && $self->has_build_conf_for( $key ) ){
         # if we are using cache
         # and we substitute the configuration for some reason
-        # we should first remove the cache for this particular identifier
-        $self->cache->remove( $identifier );
+        # we should first remove the cache for this particular key
+        $self->cache->remove( $key );
     }
 
-    $self->_add_build_conf_for( $identifier => $conf );
+    $self->_add_build_conf_for( $key => $conf );
 }
 
 has fallback     => ( is => 'ro', predicate => 1 );
@@ -75,7 +75,7 @@ sub BUILDARGS {
 }
 
 sub _build_object_from_args {
-    my ( $self, $args, $identifier ) = @_;
+    my ( $self, $args, $key ) = @_;
 
     my $class  = $self->build_class;
     my $method = $class->can( $self->build_method )
@@ -89,7 +89,7 @@ sub _build_object_from_args {
             when ('SCALAR') { return $class->$method($$args); }
             when ('REF')    { return $class->$method($$args); }
             when ('GLOB')   { return $class->$method(*$args); }
-            when ('CODE')   { return $class->$method( $args->($identifier) ); }
+            when ('CODE')   { return $class->$method( $args->($key) ); }
             default {
                 carp(   "cant autoderef argument ref('"
                       . ref($args)
@@ -102,18 +102,18 @@ sub _build_object_from_args {
 }
 
 sub _resolve_object {
-    my ( $self, $identifier ) = @_;
+    my ( $self, $key ) = @_;
 
     my $class = $self->build_class;
-    if ( $self->has_build_conf_for($identifier) ) {
+    if ( $self->has_build_conf_for($key) ) {
         return $self->_build_object_from_args(
-            $self->get_build_conf_for($identifier), $identifier );
+            $self->get_build_conf_for($key), $key );
     }
     elsif ( $self->has_fallback ) {
-        return $self->_build_object_from_args( $self->fallback, $identifier );
+        return $self->_build_object_from_args( $self->fallback, $key );
     }
    
-    $self->_set_error("instance of '$class' named '$identifier' not found");
+    $self->_set_error("instance of '$class' named '$key' not found");
     
     confess($self->error) if $self->autodie;
 
@@ -121,18 +121,18 @@ sub _resolve_object {
 }
 
 sub resolve {
-    my ( $self, $identifier ) = @_;
+    my ( $self, $key ) = @_;
 
     $self->clear_error;
     if ( $self->has_cache ) {
-        my $instance = $self->cache->get($identifier);
+        my $instance = $self->cache->get($key);
         return $instance->[0] if defined($instance);
     }
 
-    my $instance = $self->_resolve_object($identifier);
+    my $instance = $self->_resolve_object($key);
 
     if ( $self->has_cache ) {
-        $instance = $self->cache->set( $identifier => [ $instance ])->[0];
+        $instance = $self->cache->set( $key => [ $instance ])->[0];
     }
 
     return $instance;
