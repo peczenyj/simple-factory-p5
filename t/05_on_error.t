@@ -18,7 +18,8 @@ subtest "should substitute the on_error attr" => sub {
     my $instance = -1;
     warning_like { 
         $instance = $factory->resolve('boom');
-    } qr/cant resolve instance for key 'boom': ops/, 'should not die, but carp';
+    } { carped => qr/cant resolve instance for key 'boom': ops/}, 
+    'should not die, but carp';
 
     ok ! defined $instance, 'resolve should return undef';
 };

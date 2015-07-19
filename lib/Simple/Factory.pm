@@ -345,9 +345,58 @@ default: not present
 
 =head2 inline 
 
-Experimental feature. useful to create multiple inline definitions. See L<resolve>.
+B<Experimental> feature. useful to create multiple inline definitions. See L<resolve>.
 
 This feature can change in the future.
+
+=head2 on_error
+
+Change the default behavior of what happens if build one instance throws on error.
+
+Accepts a coderef. You can also use three initial shortcuts ( will be coerce to coderef ): C<croak>, C<carp> and C<fallback>.
+
+=over 4
+
+=item *
+
+C<croak> will croak the exception + extra message about the key ( B<default> ).
+
+=item *
+
+C<carp> will just carp instead croak and return undef.
+
+=item * 
+
+C<fallback> will resolve the fallback ( but in case of exception will die - to avoid one potential deadlock ).
+
+=back
+
+If one coderef was used, it will be called with one hashref as argument with three fields:
+
+=over 4
+
+=item * 
+
+C<key> with the value of the key 
+
+=item * 
+
+C<factory> one reference for the factory itself
+
+=item *
+
+C<exception> with the error message
+
+=back
+
+Example:
+
+    my $factory =  Simple::Factory->new(
+        Foo => { a => 1 },
+        on_error => sub { $logger->warn("error while resolve key '$_[0]->{key}' : '$_[0]->{exception}'; undef },
+    );
+
+    $factory->resolve("b"); # will call 'on_error', log the exception and return undef
 
 =head1 METHODS
 
@@ -416,6 +465,10 @@ Or, using C<inline> experimental option.
 
 If we have some exception when we try to create an instance for one particular key, we will not call the C<fallback>. 
 We use C<fallback> when we can't find the C<build_conf> based on the key. 
+
+=head2 get_fallback_for_key 
+
+this method will try to resolve the fallback. can be useful on C<on_error> coderefs. accept the same argument as C<resolve>.
 
 =head1 SEE ALSO
 

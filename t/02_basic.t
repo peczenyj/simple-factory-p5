@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 use Test::Exception; 
+use Test::Warn;
 use CHI;
 use Scalar::Util qw(refaddr);
 use Simple::Factory;
@@ -81,6 +82,7 @@ subtest "should autoderef" => sub {
     my $ref = { value => 2 };
     my $six = 6;
     my $glob = *STDOUT;
+    my $regexp = qr/regexp/;
 
     my $factory = Simple::Factory->new( 
         Foo => { 
@@ -93,9 +95,9 @@ subtest "should autoderef" => sub {
             g => \$six,                 # ref scalar
             h => *STDOUT,               # GLOB
             i => \$glob,                # ref GLOB
+            y => $regexp,               # regexp
             z => [],                    # empty ref array
         },
-        silence => 1,
     );
 
     is $factory->resolve('a')->value,  1, 'value of x should be 1';
@@ -106,6 +108,16 @@ subtest "should autoderef" => sub {
     is $factory->resolve('f')->value,  5, 'value of f should be 5';
     is $factory->resolve('g')->value,  6, 'value of g should be 6';
     is $factory->resolve('z')->value,  0, 'value of z should be 0 ( default )';
+
+    my $instance;
+    warning_like { 
+        $instance = $factory->resolve('y');    
+    } 
+    { carped => qr/cant autoderef argument ref\('Regexp'\) for class 'Foo'/ }, 
+    'should carp - cant defer regexp';
+
+    isa_ok $instance, 'Foo', 'instance';
+    is $instance->value, $regexp, 'should contains regexp';
 
     is $factory->resolve('h')->value, $glob, 'value of h should be *::STDOUT';
     is $factory->resolve('i')->value, $glob, 'value of h should be *::STDOUT';
