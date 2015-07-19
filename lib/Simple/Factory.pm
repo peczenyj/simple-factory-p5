@@ -49,11 +49,9 @@ sub add_build_conf_for {
 
 has fallback     => ( is => 'ro', predicate => 1 );
 has build_method => ( is => 'ro', default   => sub { "new" } );
-has autodie      => ( is => 'ro', isa       => Bool, default => sub { 1 } );
 has autoderef    => ( is => 'ro', isa       => Bool, default => sub { 1 } );
 has default      => ( is => 'ro', default   => sub { undef } );
 has cache        => ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
-has error        => ( is => 'rwp', predicate => 1, clearer => 1 );
 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
@@ -113,17 +111,12 @@ sub _resolve_object {
         return $self->_build_object_from_args( $self->fallback, $key );
     }
    
-    $self->_set_error("instance of '$class' named '$key' not found");
-    
-    confess($self->error) if $self->autodie;
-
-    return $self->default;
+    confess("instance of '$class' named '$key' not found");
 }
 
 sub resolve {
     my ( $self, $key ) = @_;
 
-    $self->clear_error;
     if ( $self->has_cache ) {
         my $instance = $self->cache->get($key);
         return $instance->[0] if defined($instance);
