@@ -102,7 +102,8 @@ sub BUILDARGS {
 
         if ( $hash_args{inline} ) {
             $hash_args{build_conf} =
-              { map { $_ => { $_ => $build_conf->{$_} } } keys %{$build_conf}, };
+              { map { $_ => { $_ => $build_conf->{$_} } } keys %{$build_conf},
+              };
         }
     }
 
