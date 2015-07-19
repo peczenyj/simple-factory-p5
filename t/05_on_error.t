@@ -1,7 +1,8 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception; 
+use Test::Exception;
+use Test::Warn;
 use CHI;
 use Scalar::Util qw(refaddr);
 use Simple::Factory;
@@ -15,9 +16,9 @@ subtest "should substitute the on_error attr" => sub {
     );
 
     my $instance = -1;
-    lives_ok { 
+    warning_like { 
         $instance = $factory->resolve('boom');
-    } 'should not die';
+    } qr/cant resolve instance for key 'boom': ops/, 'should not die, but carp';
 
     ok ! defined $instance, 'resolve should return undef';
 };
