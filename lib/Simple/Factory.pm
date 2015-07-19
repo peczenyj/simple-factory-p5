@@ -1,7 +1,6 @@
+package Simple::Factory;
 use strict;
 use warnings;
-
-package Simple::Factory;
 
 #ABSTRACT: simple factory
 
@@ -103,17 +102,18 @@ sub BUILDARGS {
 
         if ( $hash_args{inline} ) {
             $hash_args{build_conf} =
-              { map { $_ => { $_ => $build_conf->{$_} } } keys %$build_conf, };
+              { map { $_ => { $_ => $build_conf->{$_} } } keys %{$build_conf}, };
         }
     }
 
-    \%hash_args;
+    return \%hash_args;
 }
 
 sub BUILD {
     my ($self) = @_;
 
     $self->_coerce_build_method;
+    return;
 }
 
 sub _coerce_build_method {
@@ -139,9 +139,9 @@ sub _build_object_from_args {
         given ( ref($args) ) {
             when ('ARRAY')  { return $class->$method( @{$args} ); }
             when ('HASH')   { return $class->$method( %{$args} ); }
-            when ('SCALAR') { return $class->$method($$args); }
-            when ('REF')    { return $class->$method($$args); }
-            when ('GLOB')   { return $class->$method(*$args); }
+            when ('SCALAR') { return $class->$method( ${$args} ); }
+            when ('REF')    { return $class->$method( ${$args} ); }
+            when ('GLOB')   { return $class->$method( *{$args} ); }
             when ('CODE')   { return $class->$method( $args->($key) ); }
             default {
                 carp(   "cant autoderef argument ref('"
@@ -196,7 +196,7 @@ sub add_build_conf_for {
         $self->cache->remove($key);
     }
 
-    $self->_add_build_conf_for( $key => $conf );
+    return $self->_add_build_conf_for( $key => $conf );
 }
 
 around [qw(resolve get_fallback_for_key)] => sub {
@@ -353,7 +353,7 @@ default: not present
 
 =head2 inline 
 
-B<Experimental> feature. useful to create multiple inline definitions. See L<resolve>.
+B<Experimental> feature. useful to create multiple inline definitions. See L</resolve> method.
 
 This feature can change in the future.
 
