@@ -508,5 +508,5 @@ Tiago Peczenyj <tiago (dot) peczenyj (at) gmail (dot) com>
 =head1 BUGS
 
 Please report any bugs or feature requests on the bugtracker website
-https://github.com/peczenyj/simple-factory-p5/issues
+L<https://github.com/peczenyj/simple-factory-p5/issues>
 
