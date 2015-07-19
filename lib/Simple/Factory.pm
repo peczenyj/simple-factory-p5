@@ -34,19 +34,6 @@ has build_conf => (
     }
 );
 
-sub add_build_conf_for {
-    my ($self, $key, $conf ) = @_;
-
-    if ( $self->has_cache && $self->has_build_conf_for( $key ) ){
-        # if we are using cache
-        # and we substitute the configuration for some reason
-        # we should first remove the cache for this particular key
-        $self->cache->remove( $key );
-    }
-
-    $self->_add_build_conf_for( $key => $conf );
-}
-
 has fallback     => ( is => 'ro', predicate => 1 );
 has build_method => ( is => 'ro', default   => sub { "new" } );
 has autoderef    => ( is => 'ro', isa       => Bool, default => sub { 1 } );
@@ -112,6 +99,19 @@ sub _resolve_object {
     }
    
     confess("instance of '$class' named '$key' not found");
+}
+
+sub add_build_conf_for {
+    my ($self, $key, $conf ) = @_;
+
+    if ( $self->has_cache && $self->has_build_conf_for( $key ) ){
+        # if we are using cache
+        # and we substitute the configuration for some reason
+        # we should first remove the cache for this particular key
+        $self->cache->remove( $key );
+    }
+
+    $self->_add_build_conf_for( $key => $conf );
 }
 
 sub resolve {
