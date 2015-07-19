@@ -123,10 +123,8 @@ subtest "shold critique the missing of build_conf and build_class" => sub {
 }; 
 
 subtest "should critique the missing of build_method" => sub {
-    my $factory = Simple::Factory->new( Foo => { a => 1 }, build_method => 'not_exists' );
-
     throws_ok {
-        $factory->resolve('a');
+        Simple::Factory->new( Foo => { a => 1 }, build_method => 'not_exists' );
     } qr/class 'Foo' does not support build method: not_exists/, 'should die: Foo has no method "not_exists"';
 };
 

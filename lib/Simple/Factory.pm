@@ -8,10 +8,11 @@ package Simple::Factory;
 use feature 'switch';
 use Carp qw(carp croak confess);
 use Module::Runtime qw(use_module);
+use Try::Tiny;
 
 use Moo;
 use MooX::HandlesVia;
-use MooX::Types::MooseLike::Base qw(HasMethods HashRef Any Bool);
+use MooX::Types::MooseLike::Base qw(HasMethods HashRef Any Bool CodeRef);
 use namespace::autoclean;
 
 has build_class => (
@@ -43,6 +44,40 @@ has cache =>
   ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
 
 has inline => ( is => 'ro', isa => Bool, default => sub { 0 } );
+has on_error => ( 
+    is => 'ro', 
+    isa => CodeRef, 
+    default => sub { "fallback" }, 
+    coerce => sub {
+        my ($on_error) = @_;
+        
+        return $on_error if ref($on_error) eq 'CODE';
+    
+        given($on_error){
+            when ("croak") {
+                return sub {
+                    my $key = $_[0]->{key};    
+                    croak "cant resolve instance for key '$key': ". $_[0]->{exception}; 
+                }
+            }
+            when ("carp") {
+                return sub {
+                    my $key = $_[0]->{key};    
+                    carp "cant resolve instance for key '$key': ". $_[0]->{exception}; 
+                    return;
+                }
+            }
+            when ("fallback") {
+                return sub { 
+                    return $_[0]->{factory}->get_fallback_for_key( $_[0]->{key} ); 
+                }
+            }
+            default {
+                carp "can't coerce on_error '$on_error', please use: carp, croak or fallback";
+            }
+        }
+    }
+);
 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
@@ -72,13 +107,29 @@ sub BUILDARGS {
     \%hash_args;
 }
 
+sub BUILD {
+    my ( $self ) = @_;
+
+    $self->_coerce_build_method;
+}
+
+sub _coerce_build_method {
+    my ($self) = @_;
+
+    my $class  = $self->build_class;
+    my $build_method = $self->build_method;
+
+    my $method = $class->can( $self->build_method ) 
+        or croak "Error: class '$class' does not support build method: $build_method";
+
+    return $method;
+}
+
 sub _build_object_from_args {
     my ( $self, $args, $key ) = @_;
 
     my $class  = $self->build_class;
-    my $method = $class->can( $self->build_method )
-      or confess "class '$class' does not support build method: "
-      . $self->build_method;
+    my $method = $self->_coerce_build_method;
 
     if ( $self->autoderef && ref($args) ) {
         given ( ref($args) ) {
@@ -100,16 +151,25 @@ sub _build_object_from_args {
     return $class->$method($args);
 }
 
-sub _resolve_object {
+sub get_fallback_for_key {
+    my ($self, $key ) = @_;
+
+    return $self->_build_object_from_args( $self->fallback, $key );
+}
+
+sub resolve {
     my ( $self, $key ) = @_;
 
     my $class = $self->build_class;
     if ( $self->has_build_conf_for($key) ) {
-        return $self->_build_object_from_args( $self->get_build_conf_for($key),
-            $key );
+        return try { 
+            $self->_build_object_from_args( $self->get_build_conf_for($key), $key );
+        } catch {
+            $self->on_error->({ exception => $_, factory => $self, key => $key });
+        };
     }
     elsif ( $self->has_fallback ) {
-        return $self->_build_object_from_args( $self->fallback, $key );
+        return $self->get_fallback_for_key( $key ); 
     }
 
     confess("instance of '$class' named '$key' not found");
@@ -132,7 +192,8 @@ sub add_build_conf_for {
     $self->_add_build_conf_for( $key => $conf );
 }
 
-sub resolve {
+around [ qw(resolve get_fallback_for_key) ] => sub {
+    my $orig = shift;
     my ( $self, $key, @keys ) = @_;
 
     if ( $self->has_cache ) {
@@ -140,7 +201,7 @@ sub resolve {
         return $instance->[0] if defined($instance);
     }
 
-    my $instance = $self->_resolve_object($key);
+    my $instance = $self->$orig($key);
 
     if ( $self->has_cache ) {
         $instance = $self->cache->set( $key => [$instance] )->[0];
@@ -151,7 +212,7 @@ sub resolve {
     }
 
     return $instance;
-}
+};
 
 1;
 
