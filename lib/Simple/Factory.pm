@@ -44,36 +44,40 @@ has cache =>
   ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
 
 has inline => ( is => 'ro', isa => Bool, default => sub { 0 } );
-has on_error => ( 
-    is => 'ro', 
-    isa => CodeRef, 
-    default => sub { "fallback" }, 
-    coerce => sub {
+has on_error => (
+    is      => 'ro',
+    isa     => CodeRef,
+    default => sub { "fallback" },
+    coerce  => sub {
         my ($on_error) = @_;
-        
+
         return $on_error if ref($on_error) eq 'CODE';
-    
-        given($on_error){
+
+        given ($on_error) {
             when ("croak") {
                 return sub {
-                    my $key = $_[0]->{key};    
-                    croak "cant resolve instance for key '$key': ". $_[0]->{exception}; 
-                }
+                    my $key = $_[0]->{key};
+                    croak "cant resolve instance for key '$key': "
+                      . $_[0]->{exception};
+                  }
             }
             when ("carp") {
                 return sub {
-                    my $key = $_[0]->{key};    
-                    carp "cant resolve instance for key '$key': ". $_[0]->{exception}; 
+                    my $key = $_[0]->{key};
+                    carp "cant resolve instance for key '$key': "
+                      . $_[0]->{exception};
                     return;
-                }
+                  }
             }
             when ("fallback") {
-                return sub { 
-                    return $_[0]->{factory}->get_fallback_for_key( $_[0]->{key} ); 
-                }
+                return sub {
+                    return $_[0]->{factory}
+                      ->get_fallback_for_key( $_[0]->{key} );
+                  }
             }
             default {
-                croak "can't coerce on_error '$on_error', please use: carp, croak or fallback";
+                croak
+"can't coerce on_error '$on_error', please use: carp, croak or fallback";
             }
         }
     }
@@ -98,9 +102,8 @@ sub BUILDARGS {
         $hash_args{build_conf}  = $build_conf;
 
         if ( $hash_args{inline} ) {
-            $hash_args{build_conf} = {   
-                map { $_ => { $_ => $build_conf->{ $_ } } } keys %$build_conf,
-            }
+            $hash_args{build_conf} =
+              { map { $_ => { $_ => $build_conf->{$_} } } keys %$build_conf, };
         }
     }
 
@@ -108,7 +111,7 @@ sub BUILDARGS {
 }
 
 sub BUILD {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     $self->_coerce_build_method;
 }
@@ -116,11 +119,12 @@ sub BUILD {
 sub _coerce_build_method {
     my ($self) = @_;
 
-    my $class  = $self->build_class;
+    my $class        = $self->build_class;
     my $build_method = $self->build_method;
 
-    my $method = $class->can( $self->build_method ) 
-        or croak "Error: class '$class' does not support build method: $build_method";
+    my $method = $class->can( $self->build_method )
+      or croak
+      "Error: class '$class' does not support build method: $build_method";
 
     return $method;
 }
@@ -152,7 +156,7 @@ sub _build_object_from_args {
 }
 
 sub get_fallback_for_key {
-    my ($self, $key ) = @_;
+    my ( $self, $key ) = @_;
 
     return $self->_build_object_from_args( $self->fallback, $key );
 }
@@ -162,14 +166,17 @@ sub resolve {
 
     my $class = $self->build_class;
     if ( $self->has_build_conf_for($key) ) {
-        return try { 
-            $self->_build_object_from_args( $self->get_build_conf_for($key), $key );
-        } catch {
-            $self->on_error->({ exception => $_, factory => $self, key => $key });
+        return try {
+            $self->_build_object_from_args( $self->get_build_conf_for($key),
+                $key );
+        }
+        catch {
+            $self->on_error->(
+                { exception => $_, factory => $self, key => $key } );
         };
     }
     elsif ( $self->has_fallback ) {
-        return $self->get_fallback_for_key( $key ); 
+        return $self->get_fallback_for_key($key);
     }
 
     confess("instance of '$class' named '$key' not found");
@@ -192,7 +199,7 @@ sub add_build_conf_for {
     $self->_add_build_conf_for( $key => $conf );
 }
 
-around [ qw(resolve get_fallback_for_key) ] => sub {
+around [qw(resolve get_fallback_for_key)] => sub {
     my $orig = shift;
     my ( $self, $key, @keys ) = @_;
 
