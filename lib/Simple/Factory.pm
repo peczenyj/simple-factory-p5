@@ -360,7 +360,7 @@ We use C<fallback> when we can't find the C<build_conf> based on the key.
 
 =over 4
 
-=item L<Bread::Board>
+=item L<Bread::Board|Bread::Board>
 
 A solderless way to wire up your application components.
 
