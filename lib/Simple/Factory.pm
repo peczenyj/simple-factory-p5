@@ -279,6 +279,7 @@ Specify the mapping of key => arguments, storing in a hashref.
 This argument is required. You can omit by using the C<build_class> and C<build_args> as a first pair of arguments.
 
 Important: if C<autoderef> is true, we will try to deref the value before use to create an instance. 
+
 =head2 fallback
 
 The default behavior is die if we try to resolve an instance using one non-existing key.
