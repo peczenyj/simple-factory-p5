@@ -79,4 +79,11 @@ subtest "can call fallback from on_error" => sub {
     } qr/fallback/, 'should die';
 };
 
+subtest "should croak if string on_error if not croak, carp of fallback" => sub {
+    throws_ok {
+        Simple::Factory->new( Foo => { a => 1}, on_error=> "boom");
+    }
+    qr/coercion for "on_error" failed: can't coerce on_error 'boom', please use: carp, croak or fallback/, 'should die';
+};
+
 done_testing;

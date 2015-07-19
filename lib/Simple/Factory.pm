@@ -73,7 +73,7 @@ has on_error => (
                 }
             }
             default {
-                carp "can't coerce on_error '$on_error', please use: carp, croak or fallback";
+                croak "can't coerce on_error '$on_error', please use: carp, croak or fallback";
             }
         }
     }
@@ -208,7 +208,7 @@ around [ qw(resolve get_fallback_for_key) ] => sub {
     }
 
     if ( scalar(@keys) && $instance->can('resolve') ) {
-        return $instance->resolve(@keys);
+        return $instance->$orig(@keys);
     }
 
     return $instance;
