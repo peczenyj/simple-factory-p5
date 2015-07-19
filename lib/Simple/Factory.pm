@@ -282,6 +282,12 @@ If we need add a new build_conf via C<add_build_conf_for>, and override one exis
 
 default: not present
 
+=head2 inline 
+
+Experimental feature. useful to create multiple inline definitions. See L<resolve>.
+
+This feature can change in the future.
+
 =head1 METHODS
 
 =head2 add_build_conf_for
@@ -336,6 +342,16 @@ Example:
     );
 
     my $object = $factory->resolve('Foo', 'one'); # shortcut to ->resolve('Foo')->resolve('one');
+
+Or, using C<inline> experimental option.
+
+    my $factory = Simple::Factory->new(
+        'Simple::Factory'=> {
+            Foo => { one => 1, two => 2 },
+            Bar => { first => 0, last => -1},
+        },
+        inline => 1,
+    );
 
 If we have some exception when we try to create an instance for one particular key, we will not call the C<fallback>. 
 We use C<fallback> when we can't find the C<build_conf> based on the key. 
