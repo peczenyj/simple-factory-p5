@@ -136,3 +136,123 @@ sub resolve {
 
 1;
 
+__END__ 
+
+=head1 NAME
+
+Simple::Factory - a simple factory to create objects easily, with cache, autoderef and fallback supports
+
+=head1 SYNOPSYS
+
+    use Simple::Factory;
+
+    my $factory = Simple::Factory->new(
+        'My::Class' => {
+            first  => { value => 1 },
+            second => [ value => 2 ],
+        }
+        fallback => { value => undef }, # optional. in absent, will die if find no key
+    );
+
+    my $first  = $factory->resolve('first');  # will build a My::Class instance with arguments 'value => 1'
+    my $second = $factory->resolve('second'); # will build a My::Class instance with arguments 'value => 2'
+    my $last   = $factory->resolve('last');   # will build a My::Class instance with fallback arguments
+
+=head1 ATTRIBUTES
+
+=head2 build_class
+
+Specify the perl package ( class ) used to create instances. Using C<Method::Runtime>, will die if can't load the package.
+
+This argument is required. You can omit by using the C<build_class> as a first argument of the constructor.
+
+=head2 build_args
+
+Specify the mapping of key => arguments, storing in a hashref.
+
+This argument is required. You can omit by using the C<build_class> and C<build_args> as a first pair of arguments.
+
+Important: if C<autoderef> is true, we will try to deref the value before use to create an instance. 
+=head2 fallback
+
+The default behavior is die if we try to resolve an instance using one non-existing key.
+
+But if fallback is present, we will use this on the constructor.
+
+If C<autoderef> is true and fallback is a code reference, we will call the code and pass the key as an argument.
+
+=head2 build_method
+
+By default the C<Simple::Factory> calls the method C<new> but you can override and specify your own build method.
+
+Will croak if the C<build_class> does not support the method on C<resolve>.
+
+=head2 autoderef
+
+If true ( default ), we will try to deref the argument present in the C<build_conf> only if it follow this rules:
+
+- will deref only references
+- if the reference is an array, we will call the C<build_method> with C<@$array>.  
+- if the reference is a hash, we will call the C<build_method> with C<%$hash>.
+- if the reference is a scalar or other ref, we will call the C<build_method> with C<$$ref>.
+- if the reference is a glob, we will call the C<build_method> with C<*$glob>.
+- if the reference is a code, we will call the C<build_method> with $code->( $key ) ( same thinf for the fallback ) 
+- other cases (like Regexes) we will carp if it is not in C<silence> mode. 
+
+=head2 silence
+
+If true ( default is false ), we will omit the carp message if we can't C<autoderef>.
+
+=head2 cache
+
+If present, we will cache the result of the method C<resolve>. The cache should responds to C<get>, C<set> and C<remove> like L<CHI>.
+
+We will also cache fallback cases.
+
+If we need add a new build_conf via C<add_build_conf_for>, and override one existing configuration, we will remove it from the cache if possible.
+
+default: not present
+
+=head1 METHODS
+
+=head2 add_build_conf_for
+
+usage: add_build_conf_for( key => configuration )
+
+Can add a new build configuration for one specific key. It is possible add new or just override.
+
+Will remove C<cache> if possible.
+
+Example:
+    $factory->add_build_conf_for( last => { foo => 1, bar => 2 })
+
+=cut
+=head2 resolve
+
+usage: resolve( key )
+
+The main method. Will build one instance of C<build_class> using the C<build_conf> and C<build_method>. 
+
+Should receive a key and if does not exist a C<build_conf> will try use the fallback if specified, or will die ( confess ).
+
+If the C<cache> is present, will try to return first one object from the cache using the C<key>, or will resolve and
+store in the cache for the next call.
+
+=head1 SEE ALSO
+
+=over 4
+
+=item L<Bread-Board>
+
+=item L<IOC>
+
+=back
+
+=head1 AUTHOR
+
+Tiago Peczenyj 
+
+=head1 BUGS
+
+
+
