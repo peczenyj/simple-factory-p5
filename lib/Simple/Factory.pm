@@ -5,7 +5,7 @@ package Simple::Factory;
 #ABSTRACT: simple factory 
 
 use feature 'switch';
-use Carp qw(carp confess);
+use Carp qw(carp croak confess);
 use Module::Runtime qw(use_module);
 
 use Moo;
@@ -44,8 +44,15 @@ has cache        => ( is => 'ro', isa       => HasMethods [qw(get set remove)], 
 sub BUILDARGS {
     my ( $self, @args ) = @_;
 
-    unshift @args, "build_class" if scalar(@args) == 1;
-    
+    #use Data::Dumper;
+    #warn Dumper({ new => \@args });
+
+    #if( scalar( @args ) == 1 && ref( $args[0] ) && ref( $args[0] ) eq 'HASH') {
+    #    ( @args ) = %{ $args[0] };
+    #} els
+    if ( scalar( @args ) == 1 ){ 
+        unshift @args, "build_class";
+    }
     my (%hash_args) = @args;
 
     if (   scalar(@args) >= 2
@@ -59,6 +66,7 @@ sub BUILDARGS {
         $hash_args{build_conf}  = $build_conf;
     }
 
+    #warn Dumper({ nnew => \%hash_args });
     \%hash_args;
 }
 
@@ -105,9 +113,11 @@ sub _resolve_object {
 }
 
 sub add_build_conf_for {
-    my ($self, $key, $conf ) = @_;
+    my ($self, $key, $conf, %conf ) = @_;
 
-    if ( $self->has_cache && $self->has_build_conf_for( $key ) ){
+    if ( $self->has_build_conf_for( $key ) && $conf{not_override}){
+        croak("cannot override exiting configuration for key '$key'");
+    } elsif ( $self->has_build_conf_for( $key ) && $self->has_cache ){
         # if we are using cache
         # and we substitute the configuration for some reason
         # we should first remove the cache for this particular key
@@ -118,7 +128,7 @@ sub add_build_conf_for {
 }
 
 sub resolve {
-    my ( $self, $key ) = @_;
+    my ( $self, $key, @keys ) = @_;
 
     if ( $self->has_cache ) {
         my $instance = $self->cache->get($key);
@@ -129,6 +139,10 @@ sub resolve {
 
     if ( $self->has_cache ) {
         $instance = $self->cache->set( $key => [ $instance ])->[0];
+    }
+
+    if ( scalar(@keys) && $instance->can('resolve')){
+        return $instance->resolve(@keys);
     }
 
     return $instance;
@@ -160,7 +174,7 @@ Simple::Factory - a simple factory to create objects easily, with cache, autoder
 
 =head1 DESCRIPTION
 
-This is one way to implement the Factory Pattern L<http://www.oodesign.com/factory-pattern.html>. The main objective is substitute one hashref of objects ( or coderefs who can build/return objects ) by something more intelligent, who can support caching and fallbacks. If the creation rules are simple we can use C<Simple::Factory> to help us to build instances.
+This is one way to implement the L<Factory Pattern|http://www.oodesign.com/factory-pattern.html>. The main objective is substitute one hashref of objects ( or coderefs who can build/return objects ) by something more intelligent, who can support caching and fallbacks. If the creation rules are simple we can use C<Simple::Factory> to help us to build instances.
 
 We create instances with C<resolve> method. It is lazy. If you need build all instances (to store in the cache) consider try to resolve them first.
 
@@ -217,13 +231,23 @@ Will croak if the C<build_class> does not support the method on C<resolve>.
 
 If true ( default ), we will try to deref the argument present in the C<build_conf> only if it follow this rules:
 
-- will deref only references
-- if the reference is an array, we will call the C<build_method> with C<@$array>.  
-- if the reference is a hash, we will call the C<build_method> with C<%$hash>.
-- if the reference is a scalar or other ref, we will call the C<build_method> with C<$$ref>.
-- if the reference is a glob, we will call the C<build_method> with C<*$glob>.
-- if the reference is a code, we will call the C<build_method> with $code->( $key ) ( same thinf for the fallback ) 
-- other cases (like Regexes) we will carp if it is not in C<silence> mode. 
+=over 4
+
+=item 1. will deref only references
+
+=item 2. if the reference is an array, we will call the C<build_method> with C<@$array>.  
+
+=item 3. if the reference is a hash, we will call the C<build_method> with C<%$hash>.
+
+=item 4. if the reference is a scalar or other ref, we will call the C<build_method> with C<$$ref>.
+
+=item 5. if the reference is a glob, we will call the C<build_method> with C<*$glob>.
+
+=item 6. if the reference is a code, we will call the C<build_method> with $code->( $key ) ( same thinf for the fallback )
+
+=item 7. other cases (like Regexes) we will carp if it is not in C<silence> mode. 
+
+=back
 
 =head2 silence
 
@@ -243,26 +267,54 @@ default: not present
 
 =head2 add_build_conf_for
 
-usage: add_build_conf_for( key => configuration )
+usage: add_build_conf_for( key => configuration [, options ])
 
 Can add a new build configuration for one specific key. It is possible add new or just override.
+
+You can change the behavior using an hash of options. 
+
+Options: you can avoid override one existing configuration with C<not_override> and a true value.
 
 Will remove C<cache> if possible.
 
 Example:
-    $factory->add_build_conf_for( last => { foo => 1, bar => 2 })
+    $factory->add_build_conf_for( last => { foo => 1, bar => 2 }); # can override
+    $factory->add_build_conf_for( last => { ... }, not_override => 1); # will croak instead override
 
-=cut
 =head2 resolve
 
-usage: resolve( key )
+usage: resolve( key [, keys ] )
 
 The main method. Will build one instance of C<build_class> using the C<build_conf> and C<build_method>. 
 
 Should receive a key and if does not exist a C<build_conf> will try use the fallback if specified, or will die ( confess ).
 
-If the C<cache> is present, will try to return first one object from the cache using the C<key>, or will resolve and
+If the C<cache> attribute is present, will try to return first one object from the cache using the C<key>, or will resolve and
 store in the cache for the next call.
+
+You can pass multiple keys. If the instance responds to C<resolve> method, we will call with the rest of the keys. It is useful
+for inline many factories.
+
+Example:
+    my $factory = Simple::Factory->new(
+        'Simple::Factory' => {
+            Foo => {
+                build_class => 'Foo',
+                build_conf => {
+                    one => 1,
+                    two => 2,
+                }
+            },
+            Bar => {
+                Bar => {
+                    first => { ... },
+                    last => { ... },
+                }
+            }
+        }
+    );
+
+    my $object = $factory->resolve('Foo', 'one'); # shortcut to ->resolve('Foo')->resolve('one');
 
 If we have some exception when we try to create an instance for one particular key, we will not call the C<fallback>. 
 We use C<fallback> when we can't find the C<build_conf> based on the key. 

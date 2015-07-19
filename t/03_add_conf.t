@@ -22,6 +22,20 @@ subtest "should add new conf" => sub {
     is $object->value, 3, 'should create the right instance';
 };
 
+subtest "should die if will override one existing configuration" => sub {
+    my $factory = Simple::Factory->new( Foo => { a => 1, b => 2} , autoderef => 0 );
+
+    lives_ok { $factory->add_build_conf_for(c => 3, not_override => 1 ) } 'should not die: c does not exist yet';
+    
+    throws_ok { 
+        $factory->add_build_conf_for(c => 3, not_override => 1 ) 
+    } qr/cannot override exiting configuration for key 'c'/, 'should die: c already exists';
+
+    lives_ok { $factory->add_build_conf_for(c => 3, not_override => 0 ) } 'should not die: c should be override';
+
+    lives_ok { $factory->add_build_conf_for(c => 3) } 'should not die: c should be override (default)';
+};
+
 subtest "should substitute conf and clear cache" => sub {
     my $hash = {};
     my $factory = Simple::Factory->new( Foo => { a => 1, b=> 2 }, autoderef => 0, cache => CHI->new( driver => 'RawMemory', datastore => $hash ));
