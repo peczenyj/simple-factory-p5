@@ -150,13 +150,39 @@ Simple::Factory - a simple factory to create objects easily, with cache, autoder
         'My::Class' => {
             first  => { value => 1 },
             second => [ value => 2 ],
-        }
+        },
         fallback => { value => undef }, # optional. in absent, will die if find no key
     );
 
     my $first  = $factory->resolve('first');  # will build a My::Class instance with arguments 'value => 1'
     my $second = $factory->resolve('second'); # will build a My::Class instance with arguments 'value => 2'
     my $last   = $factory->resolve('last');   # will build a My::Class instance with fallback arguments
+
+=head1 DESCRIPTION
+
+This is one way to implement the Factory Pattern L<http://www.oodesign.com/factory-pattern.html>. The main objective is substitute one hashref of objects ( or coderefs who can build/return objects ) by something more intelligent, who can support caching and fallbacks. If the creation rules are simple we can use C<Simple::Factory> to help us to build instances.
+
+We create instances with C<resolve> method. It is lazy. If you need build all instances (to store in the cache) consider try to resolve them first.
+
+If you need something more complex, consider some framework of Inversion of Control (IoC).
+
+For example, we can create a simple factory to create DateTime objects, using CHI as cache:
+
+   my $factory = Simple::Factory->new(
+        build_class  => 'DateTime',
+        build_method => 'from_epoch',
+        build_conf   => {
+            one      => { epoch => 1 },
+            two      => { epoch => 2 },
+            thousand => { epoch => 1000 }
+        },
+        fallback => sub { epoch => $_[0] }, # fallback can receive the key
+        cache    => CHI->new( driver => 'Memory', global => 1),
+    );
+
+  $factory->resolve( 1024 )->epoch # returns 1024
+
+IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will B<not> call the C<fallback>. We expect some error handling from your side.
 
 =head1 ATTRIBUTES
 
@@ -238,21 +264,29 @@ Should receive a key and if does not exist a C<build_conf> will try use the fall
 If the C<cache> is present, will try to return first one object from the cache using the C<key>, or will resolve and
 store in the cache for the next call.
 
+If we have some exception when we try to create an instance for one particular key, we will not call the C<fallback>. 
+We use C<fallback> when we can't find the C<build_conf> based on the key. 
+
 =head1 SEE ALSO
 
 =over 4
 
 =item L<Bread-Board>
 
+A solderless way to wire up your application components.
+
 =item L<IOC>
+
+A lightweight IOC (Inversion of Control) framework
 
 =back
 
 =head1 AUTHOR
 
-Tiago Peczenyj 
+Tiago Peczenyj <tiago (dot) peczenyj (at) gmail (dot) com>
 
 =head1 BUGS
 
-
+Please report any bugs or feature requests on the bugtracker website
+https://github.com/peczenyj/simple-factory-p5/issues
 
