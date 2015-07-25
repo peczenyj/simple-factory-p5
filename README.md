@@ -3,7 +3,7 @@
 Simple::Factory - a simple factory to create objects easily, with cache, autoderef and fallback supports
 
 # SYNOPSYS
-```perl
+
     use Simple::Factory;
 
     my $factory = Simple::Factory->new(
@@ -17,7 +17,7 @@ Simple::Factory - a simple factory to create objects easily, with cache, autoder
     my $first  = $factory->resolve('first');  # will build a My::Class instance with arguments 'value => 1'
     my $second = $factory->resolve('second'); # will build a My::Class instance with arguments 'value => 2'
     my $last   = $factory->resolve('last');   # will build a My::Class instance with fallback arguments
-```
+
 # DESCRIPTION
 
 This is one way to implement the [Factory Pattern](http://www.oodesign.com/factory-pattern.html). The main objective is substitute one hashref of objects ( or coderefs who can build/return objects ) by something more intelligent, who can support caching and fallbacks. If the creation rules are simple we can use `Simple::Factory` to help us to build instances.
@@ -27,7 +27,7 @@ We create instances with `resolve` method. It is lazy. If you need build all ins
 If you need something more complex, consider some framework of Inversion of Control (IoC).
 
 For example, we can create a simple factory to create DateTime objects, using CHI as cache:
-```perl
+
      my $factory = Simple::Factory->new(
           build_class  => 'DateTime',
           build_method => 'from_epoch',
@@ -41,7 +41,7 @@ For example, we can create a simple factory to create DateTime objects, using CH
       );
 
     $factory->resolve( 1024 )->epoch # returns 1024
-```
+
 IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will **not** call the `fallback`. We expect some error handling from your side.
 
 # ATTRIBUTES
@@ -94,7 +94,7 @@ If true ( default is false ), we will omit the carp message if we can't `autoder
 
 If present, we will cache the result of the method `resolve`. The cache should responds to `get`, `set` and `remove` like [CHI](https://metacpan.org/pod/CHI).
 
-We will also cache fallback cases.
+We will also cache fallback cases. The key used on the cache is `build_class`:`key`, to be possible share the same cache with many factories.
 
 If we need add a new build\_conf via `add_build_conf_for`, and override one existing configuration, we will remove it from the cache if possible.
 
@@ -102,28 +102,36 @@ default: not present
 
 ## inline 
 
-**Experimental** feature. useful to create multiple inline definitions. See [resolve](https://metacpan.org/pod/resolve).
+**Experimental** feature. useful to create multiple inline definitions. See ["resolve"](#resolve) method.
 
 This feature can change in the future.
+
+## eager
+
+If true, will force `resolve` all configure keys when build the object. Useful to force caching all of them.
+
+default: false.
 
 ## on\_error
 
 Change the default behavior of what happens if build one instance throws on error.
 
-Accepts a coderef. You can also use three initial shortcuts ( will be coerce to coderef ): `croak`, `carp` and `fallback`.
+Accepts a coderef. You can also use three initial shortcuts ( will be coerce to coderef ): `croak`, `carp`, `confess`, `fallback` and `undef`.
 
 - `croak` will croak the exception + extra message about the key ( **default** ).
+- `confess` will confess, instead croak the exception.
 - `carp` will just carp instead croak and return undef.
 - `fallback` will resolve the fallback ( but in case of exception will die - to avoid one potential deadlock ).
+- `undef` will return an undefined value.
 
 Example:
-```perl
+
     my $factory = Simple::Factory->new(
         Foo => { ... },
         fallback => -1,
         on_error => "fallback" # in case of some exception, call the fallback
     );
-```
+
 If one coderef was used, it will be called with one hashref as argument with three fields:
 
 - `key` with the value of the key 
@@ -131,14 +139,14 @@ If one coderef was used, it will be called with one hashref as argument with thr
 - `exception` with the error message
 
 Example:
-```perl
+
     my $factory =  Simple::Factory->new(
         Foo => { a => 1 },
         on_error => sub { $logger->warn("error while resolve key '$_[0]->{key}' : '$_[0]->{exception}'; undef },
     );
 
     $factory->resolve("b"); # will call 'on_error', log the exception and return undef
-```
+
 # METHODS
 
 ## add\_build\_conf\_for
@@ -154,10 +162,10 @@ Options: you can avoid override one existing configuration with `not_override` a
 Will remove `cache` if possible.
 
 Example:
-```perl
+
     $factory->add_build_conf_for( last => { foo => 1, bar => 2 }); # can override
     $factory->add_build_conf_for( last => { ... }, not_override => 1); # will croak instead override
-```
+
 ## resolve
 
 usage: resolve( key \[, keys \] )
@@ -173,7 +181,7 @@ You can pass multiple keys. If the instance responds to `resolve` method, we wil
 for inline many factories.
 
 Example:
-```perl
+
     my $factory = Simple::Factory->new(
         'Simple::Factory' => {
             Foo => {
@@ -193,9 +201,9 @@ Example:
     );
 
     my $object = $factory->resolve('Foo', 'one'); # shortcut to ->resolve('Foo')->resolve('one');
-```
+
 Or, using `inline` experimental option.
-```perl
+
     my $factory = Simple::Factory->new(
         'Simple::Factory'=> {
             Foo => { one => 1, two => 2 },
@@ -203,9 +211,11 @@ Or, using `inline` experimental option.
         },
         inline => 1,
     );
-```
+
 If we have some exception when we try to create an instance for one particular key, we will not call the `fallback`. 
 We use `fallback` when we can't find the `build_conf` based on the key. 
+
+To change the behavior check the attr `on_error`.
 
 ## get\_fallback\_for\_key 
 
@@ -221,6 +231,35 @@ this method will try to resolve the fallback. can be useful on `on_error` codere
 
     A lightweight IOC (Inversion of Control) framework
 
+# LICENSE
+
+The MIT License
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software
+    without restriction, including without limitation the rights to
+    use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to
+    whom the Software is furnished to do so, subject to the
+    following conditions:
+     
+     The above copyright notice and this permission notice shall
+     be included in all copies or substantial portions of the
+     Software.
+      
+      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT
+      WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+      INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+      MERCHANTABILITY, FITNESS FOR A PARTICULAR
+      PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+      SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+      LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+      LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+      TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+      CONNECTION WITH THE SOFTWARE OR THE USE OR
+      OTHER DEALINGS IN THE SOFTWARE.
+
 # AUTHOR
 
 Tiago Peczenyj <tiago (dot) peczenyj (at) gmail (dot) com>
@@ -228,4 +267,4 @@ Tiago Peczenyj <tiago (dot) peczenyj (at) gmail (dot) com>
 # BUGS
 
 Please report any bugs or feature requests on the bugtracker website
-https://github.com/peczenyj/simple-factory-p5/issues
+[https://github.com/peczenyj/simple-factory-p5/issues](https://github.com/peczenyj/simple-factory-p5/issues)

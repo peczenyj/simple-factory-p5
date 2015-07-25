@@ -9,6 +9,47 @@ use Simple::Factory;
 
 use lib 't/lib';
 
+subtest "default is croak when error (default)" => sub {
+    my $factory = Simple::Factory->new(
+        Foo => {
+            boom => sub { die "ops" }
+        },  
+    );  
+
+	throws_ok { 
+		$factory->resolve('boom');
+	} qr/cant resolve instance for key 'boom': ops/,
+	'should croak';
+};
+
+subtest "default is croak when error" => sub {
+    my $factory = Simple::Factory->new(
+        Foo => {
+            boom => sub { die "ops" }
+        },  
+		on_error => "croak",
+    );  
+
+    throws_ok { 
+        $factory->resolve('boom');
+    } qr/cant resolve instance for key 'boom': ops/,
+    'should croak';
+};
+
+subtest "default is confess when error" => sub {
+    my $factory = Simple::Factory->new(
+        Foo => {
+            boom => sub { die "ops" }
+        },  
+		on_error => "confess",
+    );  
+
+    throws_ok { 
+        $factory->resolve('boom');
+    } qr/cant resolve instance for key 'boom': ops/,
+    'should croak';
+};
+
 subtest "should substitute the on_error attr" => sub {
     my $factory = Simple::Factory->new(
         Foo => {
@@ -27,12 +68,12 @@ subtest "should substitute the on_error attr" => sub {
     ok !defined $instance, 'resolve should return undef';
 };
 
-subtest "should substitute the on_error attr from coderef" => sub {
+subtest "should return undef if on_error is 'undef'" => sub {
     my $factory = Simple::Factory->new(
         Foo => {
             boom => sub { die "ops" }
         },
-        on_error => sub { undef },    # will return undef
+        on_error => "undef",    # will return undef
     );
 
     my $instance = -1;
@@ -42,6 +83,25 @@ subtest "should substitute the on_error attr from coderef" => sub {
     'should not die';
 
     ok !defined $instance, 'resolve should return undef';
+};
+
+subtest "should substitute the on_error attr from coderef" => sub {
+    my $other = bless {}, 'other';
+    my $factory = Simple::Factory->new(
+        Foo => {
+            boom => sub { die "ops" }
+        },
+        on_error => sub { $other },    # will return other obj
+    );
+
+    my $instance = -1;
+    lives_ok {
+        $instance = $factory->resolve('boom');
+    }
+    'should not die';
+
+    ok defined $instance, 'resolve should NOT return undef';
+    is refaddr($instance), refaddr($other), 'should return other';
 };
 
 subtest "should be able to call the fallback" => sub {
@@ -98,7 +158,7 @@ subtest "should croak if string on_error if not croak, carp of fallback" =>
     throws_ok {
         Simple::Factory->new( Foo => { a => 1 }, on_error => "boom" );
     }
-qr/coercion for "on_error" failed: can't coerce on_error 'boom', please use: carp, croak or fallback/,
+    qr/coercion for "on_error" failed: can't coerce on_error 'boom', please use: carp, confess, croak, fallback or undef/,
       'should die';
   };
 

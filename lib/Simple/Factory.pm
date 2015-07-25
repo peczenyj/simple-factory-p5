@@ -8,6 +8,7 @@ use feature 'switch';
 use Carp qw(carp croak confess);
 use Module::Runtime qw(use_module);
 use Try::Tiny;
+use Scalar::Util qw(blessed);
 
 use Moo;
 use MooX::HandlesVia;
@@ -31,6 +32,7 @@ has build_conf => (
     handles     => {
         has_build_conf_for  => 'exists',
         get_build_conf_for  => 'get',
+        get_supported_keys  => 'keys',
         _add_build_conf_for => 'set',
     }
 );
@@ -43,10 +45,11 @@ has cache =>
   ( is => 'ro', isa => HasMethods [qw(get set remove)], predicate => 1 );
 
 has inline => ( is => 'ro', isa => Bool, default => sub { 0 } );
+has eager  => ( is => 'ro', isa => Bool, default => sub { 0 } );
 has on_error => (
     is      => 'ro',
     isa     => CodeRef,
-    default => sub { "fallback" },
+    default => sub { "croak" },
     coerce  => sub {
         my ($on_error) = @_;
 
@@ -59,6 +62,13 @@ has on_error => (
                     croak "cant resolve instance for key '$key': "
                       . $_[0]->{exception};
                   }
+            }
+            when ("confess"){
+                return sub {
+                    my $key = $_[0]->{key};
+                    confess "cant resolve instance for key '$key': "
+                      . $_[0]->{exception};
+                }
             }
             when ("carp") {
                 return sub {
@@ -74,9 +84,12 @@ has on_error => (
                       ->get_fallback_for_key( $_[0]->{key} );
                   }
             }
+            when ("undef") {
+                return sub { undef }
+            }
             default {
                 croak
-"can't coerce on_error '$on_error', please use: carp, croak or fallback";
+"can't coerce on_error '$on_error', please use: carp, confess, croak, fallback or undef";
             }
         }
     }
@@ -114,6 +127,11 @@ sub BUILD {
     my ($self) = @_;
 
     $self->_coerce_build_method;
+    
+    if ( $self->eager ){
+        $self->resolve($_) for $self->get_supported_keys;
+    }
+
     return;
 }
 
@@ -189,31 +207,64 @@ sub add_build_conf_for {
     if ( $self->has_build_conf_for($key) && $conf{not_override} ) {
         croak("cannot override exiting configuration for key '$key'");
     }
-    elsif ( $self->has_build_conf_for($key) && $self->has_cache ) {
+    elsif ( $self->has_build_conf_for($key) ) {
 
         # if we are using cache
         # and we substitute the configuration for some reason
         # we should first remove the cache for this particular key
-        $self->cache->remove($key);
+        $self->_cache_remove($key);
     }
 
     return $self->_add_build_conf_for( $key => $conf );
+}
+
+sub _get_urn_for_cache {
+    my ($self, $key) = @_;
+    
+    join q<:>, $self->build_class, $key;
+}
+
+sub _cache_remove {
+    my ($self, $key) = @_;
+
+    return if ! $self->has_cache;
+
+    $self->cache->remove( $self->_get_urn_for_cache( $key ));
+}
+
+sub _cache_set {
+    my ($self, $key, $value) = @_;
+
+    return if ! $self->has_cache;
+
+    my $urn = $self->_get_urn_for_cache($key);
+
+    $self->cache->set( $urn => $value );
+}
+
+sub _cache_get {
+    my ($self, $key ) = @_;
+
+    return if ! $self->has_cache;
+
+    my $urn = $self->_get_urn_for_cache( $key );
+
+    my $cached = $self->cache->get( $urn );
+    
+    return $cached if $cached;
 }
 
 around [qw(resolve get_fallback_for_key)] => sub {
     my $orig = shift;
     my ( $self, $key, @keys ) = @_;
 
-    if ( $self->has_cache ) {
-        my $instance = $self->cache->get($key);
-        return $instance->[0] if defined($instance);
-    }
+    my $cached_value = $self->_cache_get( $key );
+
+    return $cached_value->[0] if $cached_value;
 
     my $instance = $self->$orig($key);
 
-    if ( $self->has_cache ) {
-        $instance = $self->cache->set( $key => [$instance] )->[0];
-    }
+    $self->_cache_set( $key => [$instance] );
 
     if ( scalar(@keys) && $instance->can('resolve') ) {
         return $instance->$orig(@keys);
@@ -346,7 +397,7 @@ If true ( default is false ), we will omit the carp message if we can't C<autode
 
 If present, we will cache the result of the method C<resolve>. The cache should responds to C<get>, C<set> and C<remove> like L<CHI|CHI>.
 
-We will also cache fallback cases.
+We will also cache fallback cases. The key used on the cache is C<build_class>:C<key>, to be possible share the same cache with many factories.
 
 If we need add a new build_conf via C<add_build_conf_for>, and override one existing configuration, we will remove it from the cache if possible.
 
@@ -358,17 +409,27 @@ B<Experimental> feature. useful to create multiple inline definitions. See L</re
 
 This feature can change in the future.
 
+=head2 eager
+
+If true, will force C<resolve> all configure keys when build the object. Useful to force caching all of them.
+
+default: false.
+
 =head2 on_error
 
 Change the default behavior of what happens if build one instance throws on error.
 
-Accepts a coderef. You can also use three initial shortcuts ( will be coerce to coderef ): C<croak>, C<carp> and C<fallback>.
+Accepts a coderef. You can also use three initial shortcuts ( will be coerce to coderef ): C<croak>, C<carp>, C<confess>, C<fallback> and C<undef>.
 
 =over 4
 
 =item *
 
 C<croak> will croak the exception + extra message about the key ( B<default> ).
+
+=item * 
+
+C<confess> will confess, instead croak the exception.
 
 =item *
 
@@ -377,6 +438,10 @@ C<carp> will just carp instead croak and return undef.
 =item * 
 
 C<fallback> will resolve the fallback ( but in case of exception will die - to avoid one potential deadlock ).
+
+=item *
+
+C<undef> will return an undefined value.
 
 =back
 
@@ -482,6 +547,8 @@ Or, using C<inline> experimental option.
 
 If we have some exception when we try to create an instance for one particular key, we will not call the C<fallback>. 
 We use C<fallback> when we can't find the C<build_conf> based on the key. 
+
+To change the behavior check the attr C<on_error>.
 
 =head2 get_fallback_for_key 
 
