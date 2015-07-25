@@ -3,7 +3,7 @@
 Simple::Factory - a simple factory to create objects easily, with cache, autoderef and fallback supports
 
 # SYNOPSYS
-
+```perl
     use Simple::Factory;
 
     my $factory = Simple::Factory->new(
@@ -17,7 +17,7 @@ Simple::Factory - a simple factory to create objects easily, with cache, autoder
     my $first  = $factory->resolve('first');  # will build a My::Class instance with arguments 'value => 1'
     my $second = $factory->resolve('second'); # will build a My::Class instance with arguments 'value => 2'
     my $last   = $factory->resolve('last');   # will build a My::Class instance with fallback arguments
-
+```
 # DESCRIPTION
 
 This is one way to implement the [Factory Pattern](http://www.oodesign.com/factory-pattern.html). The main objective is substitute one hashref of objects ( or coderefs who can build/return objects ) by something more intelligent, who can support caching and fallbacks. If the creation rules are simple we can use `Simple::Factory` to help us to build instances.
@@ -27,7 +27,7 @@ We create instances with `resolve` method. It is lazy. If you need build all ins
 If you need something more complex, consider some framework of Inversion of Control (IoC).
 
 For example, we can create a simple factory to create DateTime objects, using CHI as cache:
-
+```perl
      my $factory = Simple::Factory->new(
           build_class  => 'DateTime',
           build_method => 'from_epoch',
@@ -41,8 +41,9 @@ For example, we can create a simple factory to create DateTime objects, using CH
       );
 
     $factory->resolve( 1024 )->epoch # returns 1024
-
-IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will **not** call the `fallback`. We expect some error handling from your side.
+```
+IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will **not** call the `fallback`. 
+Check ["on\_error"](#on_error) attribute to change the default behavior.
 
 # ATTRIBUTES
 
@@ -125,13 +126,13 @@ Accepts a coderef. You can also use three initial shortcuts ( will be coerce to 
 - `undef` will return an undefined value.
 
 Example:
-
+```perl
     my $factory = Simple::Factory->new(
         Foo => { ... },
         fallback => -1,
         on_error => "fallback" # in case of some exception, call the fallback
     );
-
+```
 If one coderef was used, it will be called with one hashref as argument with three fields:
 
 - `key` with the value of the key 
@@ -139,14 +140,14 @@ If one coderef was used, it will be called with one hashref as argument with thr
 - `exception` with the error message
 
 Example:
-
+```perl
     my $factory =  Simple::Factory->new(
         Foo => { a => 1 },
         on_error => sub { $logger->warn("error while resolve key '$_[0]->{key}' : '$_[0]->{exception}'; undef },
     );
 
     $factory->resolve("b"); # will call 'on_error', log the exception and return undef
-
+```
 # METHODS
 
 ## add\_build\_conf\_for
@@ -162,10 +163,10 @@ Options: you can avoid override one existing configuration with `not_override` a
 Will remove `cache` if possible.
 
 Example:
-
+```perl
     $factory->add_build_conf_for( last => { foo => 1, bar => 2 }); # can override
     $factory->add_build_conf_for( last => { ... }, not_override => 1); # will croak instead override
-
+```
 ## resolve
 
 usage: resolve( key \[, keys \] )
@@ -181,7 +182,7 @@ You can pass multiple keys. If the instance responds to `resolve` method, we wil
 for inline many factories.
 
 Example:
-
+```perl
     my $factory = Simple::Factory->new(
         'Simple::Factory' => {
             Foo => {
@@ -201,9 +202,9 @@ Example:
     );
 
     my $object = $factory->resolve('Foo', 'one'); # shortcut to ->resolve('Foo')->resolve('one');
-
+```
 Or, using `inline` experimental option.
-
+```perl
     my $factory = Simple::Factory->new(
         'Simple::Factory'=> {
             Foo => { one => 1, two => 2 },
@@ -211,7 +212,7 @@ Or, using `inline` experimental option.
         },
         inline => 1,
     );
-
+```
 If we have some exception when we try to create an instance for one particular key, we will not call the `fallback`. 
 We use `fallback` when we can't find the `build_conf` based on the key. 
 

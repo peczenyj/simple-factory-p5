@@ -321,7 +321,8 @@ For example, we can create a simple factory to create DateTime objects, using CH
 
   $factory->resolve( 1024 )->epoch # returns 1024
 
-IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will B<not> call the C<fallback>. We expect some error handling from your side.
+IMPORTANT: if the creation fails ( like some excetion from the constructor ), we will B<not> call the C<fallback>. 
+Check L</on_error> attribute to change the default behavior.
 
 =head1 ATTRIBUTES
 
